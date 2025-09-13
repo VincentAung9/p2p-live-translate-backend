@@ -1,6 +1,11 @@
-let port = process.env.PORT || 3000;
+const { Server } = require("socket.io");
+const express = require("express");
+const http = require('http');
 
-let IO = require("socket.io")(port, {
+const app = express();
+const server = http.createServer(app);
+
+const IO = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
@@ -81,4 +86,9 @@ IO.on("connection", (socket) => {
       iceCandidate: iceCandidate,
     });
   });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Socket.IO server running on port ${PORT}`);
 });
