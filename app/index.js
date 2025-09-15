@@ -11,7 +11,8 @@ const fs = require("fs");
 
 const speech = require("@google-cloud/speech");
 const { Translate } = require("@google-cloud/translate").v2;
-
+const client = new speech.SpeechClient(); // for STT
+const translate = new Translate(); // for translation
 // If running locally with .env
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   process.env.GOOGLE_APPLICATION_CREDENTIALS = path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS);
@@ -144,7 +145,7 @@ IO.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log(socket.user, "Disconnected");
-    rec.free();
+    recognizeStream.free();
   });
 });
 
