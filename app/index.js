@@ -11,7 +11,6 @@ const fs = require("fs");
 
 const speech = require("@google-cloud/speech");
 const { Translate } = require("@google-cloud/translate").v2;
-const client = new speech.SpeechClient(); // for STT
 const translate = new Translate(); // for translation
 // If running locally with .env
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
@@ -27,6 +26,11 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64) {
   );
   process.env.GOOGLE_APPLICATION_CREDENTIALS = keyPath;
 }
+console.log("Temp key path:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
+console.log("File exists?", fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS));
+
+const client = new speech.SpeechClient(); // for STT
+
 
 const IO = new Server(server, {
   cors: {
