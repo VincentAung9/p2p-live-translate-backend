@@ -28,8 +28,8 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64) {
   );
   process.env.GOOGLE_APPLICATION_CREDENTIALS = keyPath;
 }
-console.log("Temp key path:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
-console.log("File exists?", fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS));
+console.log("Temp key path:", process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64);
+console.log("File exists?", fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64));
 
 const client = new speech.SpeechClient(); // for STT
 
