@@ -6,8 +6,6 @@ const app = express();
 const server = http.createServer(app);
 
 require("dotenv").config();
-console.log("Base64 var:", !!process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64);
-
 const path = require("path");
 const fs = require("fs");
 
@@ -105,6 +103,7 @@ IO.on("connection", (socket) => {
       })
       .on("error", (err) => console.error("STT error:", err))
       .on("data", async (sttData) => {
+        console.log(sttData,"STTData");
         const transcription =
           sttData.results[0]?.alternatives[0]?.transcript || "";
         if (transcription) {
@@ -116,7 +115,7 @@ IO.on("connection", (socket) => {
             transcription,
             targetLang
           );
-
+          console.log(translatedText,"Translated-text");
           // Send both original + translated back
           socket.to(data.to).emit("sttResult", {
             text: transcription,
@@ -151,7 +150,11 @@ IO.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log(socket.user, "Disconnected");
-    recognizeStream.free();
+    if (recognizeStream) {
+      recognizeStream.end();
+      recognizeStream = null;
+      console.log("Stopped STT for", socket.user);
+    }
   });
 });
 
