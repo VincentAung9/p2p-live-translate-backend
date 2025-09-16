@@ -6,6 +6,8 @@ const app = express();
 const server = http.createServer(app);
 
 require("dotenv").config();
+console.log("Base64 var:", !!process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64);
+
 const path = require("path");
 const fs = require("fs");
 
