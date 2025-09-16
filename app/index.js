@@ -134,9 +134,13 @@ IO.on("connection", (socket) => {
   });
 
   socket.on("audioChunk", (chunk) => {
-    if (recognizeStream) {
+   if (recognizeStream && !recognizeStream.destroyed) {
+    try {
       recognizeStream.write(chunk);
+    } catch (err) {
+      console.error("Error writing audio chunk:", err);
     }
+  }
   });
 
   socket.on("stopSTT", () => {
