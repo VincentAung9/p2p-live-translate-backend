@@ -102,7 +102,7 @@ socket.on("audioRecording", async (data) => {
       languageCode: data.language || "en-US",
     },
     audio: {
-      content: audioBytes.toString("base64"), // Send the whole file as a base64 string
+      content: Buffer.from(data.audio).toString("base64"), // Send the whole file as a base64 string
     },
   };
 
