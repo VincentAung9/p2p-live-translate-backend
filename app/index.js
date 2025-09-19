@@ -86,7 +86,60 @@ IO.on("connection", (socket) => {
     });
   });
 
-  // --- Speech-to-Text + Translation ---
+  // Remove your old socket.on("startSTT"), socket.on("audioChunk"), 
+// and socket.on("stopSTT") handlers and replace them with this.
+
+socket.on("audioRecording", async (data) => {
+  console.log(`Received audio recording from ${socket.user} for language ${data.language}`);
+
+  // The 'data.audio' should be the Uint8List (Buffer) from your Flutter app
+  const audioBytes = data.audio;
+
+  const request = {
+    config: {
+      encoding: "LINEAR16", // Or "AAC" if you used Codec.aacADTS in Flutter
+      sampleRateHertz: 16000,
+      languageCode: data.language || "en-US",
+    },
+    audio: {
+      content: audioBytes.toString("base64"), // Send the whole file as a base64 string
+    },
+  };
+
+  try {
+    // 1. Use the non-streaming recognize method
+    const [response] = await client.recognize(request);
+    const transcription = response.results
+      .map((result) => result.alternatives[0].transcript)
+      .join("\n");
+
+    console.log(`Transcription [${socket.user}]: ${transcription}`);
+
+    if (transcription) {
+      // 2. Translate the final transcription
+      const targetLang = data.language === "en-US" ? "my" : "en";
+      const [translatedText] = await translate.translate(
+        transcription,
+        targetLang
+      );
+      console.log(`Translated [${socket.user}]: ${translatedText}`);
+
+      // 3. Send the final result back to the client(s)
+      const resultPayload = {
+        text: transcription,
+        translated: translatedText,
+      };
+      
+      // Send to the other user
+      socket.to(data.to).emit("sttResult", resultPayload);
+      // Send back to the original user
+      socket.emit("sttResult", resultPayload);
+    }
+  } catch (err) {
+    console.error("Google Speech-to-Text Error:", err);
+  }
+});
+/*   // --- Speech-to-Text + Translation ---
   let recognizeStream = null;
 
   socket.on("startSTT", (data) => {
@@ -159,7 +212,7 @@ IO.on("connection", (socket) => {
       recognizeStream = null;
       console.log("Stopped STT for", socket.user);
     }
-  });
+  }); */
 });
 
 const PORT = process.env.PORT || 3000;
