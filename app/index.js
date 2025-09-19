@@ -109,6 +109,7 @@ socket.on("audioRecording", async (data) => {
   try {
     // 1. Use the non-streaming recognize method
     const [response] = await client.recognize(request);
+    console.log(`Response [${JSON.stringify(response)}]`);
     const transcription = response.results
       .map((result) => result.alternatives[0].transcript)
       .join("\n");
