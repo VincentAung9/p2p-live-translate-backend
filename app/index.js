@@ -130,12 +130,14 @@ socket.on("audioRecording", async (data) => {
       const resultPayload = {
         text: transcription,
         translated: translatedText,
+        from:socket.user,
+        to:data.to,
       };
       
       // Send to the other user
       socket.to(data.to).emit("sttResult", resultPayload);
       // Send back to the original user
-      //socket.emit("sttResult", resultPayload);
+      socket.emit("sttResult", resultPayload);
     }
   } catch (err) {
     console.error("Google Speech-to-Text Error:", err);
