@@ -88,135 +88,135 @@ IO.on("connection", (socket) => {
   });
 
   // Remove your old socket.on("startSTT"), socket.on("audioChunk"), 
-// and socket.on("stopSTT") handlers and replace them with this.
+  // and socket.on("stopSTT") handlers and replace them with this.
 
-socket.on("audioRecording", async (data) => {
-  console.log(`Received audio recording from ${socket.user} for language ${data.language}`);
+  socket.on("audioRecording", async (data) => {
+    console.log(`Received audio recording from ${socket.user} for language ${data.language}`);
 
-  // The 'data.audio' should be the Uint8List (Buffer) from your Flutter app
-  const audioBytes = data.audio;
+    // The 'data.audio' should be the Uint8List (Buffer) from your Flutter app
+    const audioBytes = data.audio;
 
-  const request = {
-    config: {
-      encoding: "LINEAR16", // Or "AAC" if you used Codec.aacADTS in Flutter
-      sampleRateHertz: 16000,
-      languageCode: data.language || "en-US",
-    },
-    audio: {
-      content: Buffer.from(data.audio).toString("base64"), // Send the whole file as a base64 string
-    },
-  };
+    const request = {
+      config: {
+        encoding: "LINEAR16", // Or "AAC" if you used Codec.aacADTS in Flutter
+        sampleRateHertz: 16000,
+        languageCode: data.language || "en-US",
+      },
+      audio: {
+        content: Buffer.from(data.audio).toString("base64"), // Send the whole file as a base64 string
+      },
+    };
 
-  try {
-    // 1. Use the non-streaming recognize method
-    const [response] = await client.recognize(request);
-    console.log(`Response [${JSON.stringify(response)}]`);
-    const transcription = response.results
-      .map((result) => result.alternatives[0].transcript)
-      .join("\n");
-
-    console.log(`Transcription [${socket.user}]: ${transcription}`);
-
-    if (transcription) {
-      // 2. Translate the final transcription
-      const targetLang = data.language === "en-US" ? "my" : "en";
-      const [translatedText] = await translate.translate(
-        transcription,
-        targetLang
-      );
-      console.log(`Translated [${socket.user}]: ${translatedText}`);
-
-      // 3. Send the final result back to the client(s)
-      const resultPayload = {
-        text: transcription,
-        translated: translatedText,
-        from:socket.user,
-        to:data.to,
-      };
-      
-      // Send to the other user
-      socket.to(data.to).emit("sttResult", resultPayload);
-      // Send back to the original user
-      socket.emit("sttResult", resultPayload);
-    }
-  } catch (err) {
-    console.error("Google Speech-to-Text Error:", err);
-  }
-});
-/*   // --- Speech-to-Text + Translation ---
-  let recognizeStream = null;
-
-  socket.on("startSTT", (data) => {
-    console.log("Starting STT for", socket.user, "lang:", data.language);
-
-    recognizeStream = client
-      .streamingRecognize({
-        config: {
-          encoding: "LINEAR16",
-          sampleRateHertz: 16000,
-          languageCode: data.language || "en-US", // choose "en-US" or "my-MM"
-        },
-        interimResults: true,
-      })
-      .on("error", (err) => console.error("STT error:", err))
-      .on("data", async (sttData) => {
-        console.log(sttData,"STTData");
-        const transcription =
-          sttData.results[0]?.alternatives[0]?.transcript || "";
-        if (transcription) {
-          console.log(`Transcription [${socket.user}]: ${transcription}`);
-
-          // Auto-detect translation target
-          let targetLang = data.language === "en-US" ? "my" : "en";
-          let [translatedText] = await translate.translate(
-            transcription,
-            targetLang
-          );
-          console.log(translatedText,"Translated-text");
-          // Send both original + translated back
-          socket.to(data.to).emit("sttResult", {
-            text: transcription,
-            translated: translatedText,
-            from: data.language,
-            to: targetLang,
-          });
-          socket.emit("sttResult", {
-            text: transcription,
-            translated: translatedText,
-            from: data.language,
-            to: targetLang,
-          });
-        }
-      });
-  });
-
-  socket.on("audioChunk", (chunk) => {
-   if (recognizeStream && !recognizeStream.destroyed) {
     try {
-      recognizeStream.write(chunk);
+      // 1. Use the non-streaming recognize method
+      const [response] = await client.recognize(request);
+      console.log(`Response [${JSON.stringify(response)}]`);
+      const transcription = response.results
+        .map((result) => result.alternatives[0].transcript)
+        .join("\n");
+
+      console.log(`Transcription [${socket.user}]: ${transcription}`);
+
+      if (transcription) {
+        // 2. Translate the final transcription
+        const targetLang = data.language === "en-US" ? "my" : "en";
+        const [translatedText] = await translate.translate(
+          transcription,
+          targetLang
+        );
+        console.log(`Translated [${socket.user}]: ${translatedText}`);
+
+        // 3. Send the final result back to the client(s)
+        const resultPayload = {
+          text: transcription,
+          translated: translatedText,
+          from: socket.user,
+          to: data.to,
+        };
+
+        // Send to the other user
+        socket.to(data.to).emit("sttResult", resultPayload);
+        // Send back to the original user
+        //socket.emit("sttResult", resultPayload);
+      }
     } catch (err) {
-      console.error("Error writing audio chunk:", err);
-    }
-  }
-  });
-
-  socket.on("stopSTT", () => {
-    if (recognizeStream) {
-      recognizeStream.end();
-      recognizeStream = null;
-      console.log("Stopped STT for", socket.user);
+      console.error("Google Speech-to-Text Error:", err);
     }
   });
-
-
-  socket.on("disconnect", () => {
-    console.log(socket.user, "Disconnected");
-    if (recognizeStream) {
-      recognizeStream.end();
-      recognizeStream = null;
-      console.log("Stopped STT for", socket.user);
+  /*   // --- Speech-to-Text + Translation ---
+    let recognizeStream = null;
+  
+    socket.on("startSTT", (data) => {
+      console.log("Starting STT for", socket.user, "lang:", data.language);
+  
+      recognizeStream = client
+        .streamingRecognize({
+          config: {
+            encoding: "LINEAR16",
+            sampleRateHertz: 16000,
+            languageCode: data.language || "en-US", // choose "en-US" or "my-MM"
+          },
+          interimResults: true,
+        })
+        .on("error", (err) => console.error("STT error:", err))
+        .on("data", async (sttData) => {
+          console.log(sttData,"STTData");
+          const transcription =
+            sttData.results[0]?.alternatives[0]?.transcript || "";
+          if (transcription) {
+            console.log(`Transcription [${socket.user}]: ${transcription}`);
+  
+            // Auto-detect translation target
+            let targetLang = data.language === "en-US" ? "my" : "en";
+            let [translatedText] = await translate.translate(
+              transcription,
+              targetLang
+            );
+            console.log(translatedText,"Translated-text");
+            // Send both original + translated back
+            socket.to(data.to).emit("sttResult", {
+              text: transcription,
+              translated: translatedText,
+              from: data.language,
+              to: targetLang,
+            });
+            socket.emit("sttResult", {
+              text: transcription,
+              translated: translatedText,
+              from: data.language,
+              to: targetLang,
+            });
+          }
+        });
+    });
+  
+    socket.on("audioChunk", (chunk) => {
+     if (recognizeStream && !recognizeStream.destroyed) {
+      try {
+        recognizeStream.write(chunk);
+      } catch (err) {
+        console.error("Error writing audio chunk:", err);
+      }
     }
-  }); */
+    });
+  
+    socket.on("stopSTT", () => {
+      if (recognizeStream) {
+        recognizeStream.end();
+        recognizeStream = null;
+        console.log("Stopped STT for", socket.user);
+      }
+    });
+  
+  
+    socket.on("disconnect", () => {
+      console.log(socket.user, "Disconnected");
+      if (recognizeStream) {
+        recognizeStream.end();
+        recognizeStream = null;
+        console.log("Stopped STT for", socket.user);
+      }
+    }); */
 });
 
 const PORT = process.env.PORT || 3000;
