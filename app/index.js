@@ -10,8 +10,9 @@ const path = require("path");
 const fs = require("fs");
 
 const speech = require("@google-cloud/speech");
-const { Translate } = require("@google-cloud/translate").v2;
-const translate = new Translate(); // for translation
+const { TranslationServiceClient } = require("@google-cloud/translate").v3;
+const translationClient = new TranslationServiceClient(); // V3 client
+
 // If running locally with .env
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   process.env.GOOGLE_APPLICATION_CREDENTIALS = path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS);
@@ -30,7 +31,8 @@ console.log("Temp key path:", process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64)
 console.log("File exists?", fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64));
 
 const client = new speech.SpeechClient(); // for STT
-
+const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID; 
+const location = "global"; // V3 translation client location
 
 const IO = new Server(server, {
   cors: {
@@ -55,7 +57,7 @@ IO.on("connection", (socket) => {
   socket.on("makeCall", (data) => {
     let calleeId = data.calleeId;
     let sdpOffer = data.sdpOffer;
-    console.log(`Make Call: to${calleeId} from:${socket.user}`)
+    console.log(`Make Call: to${calleeId} from:${socket.user}`);
     socket.to(calleeId).emit("newCall", {
       callerId: socket.user,
       sdpOffer,
@@ -87,23 +89,19 @@ IO.on("connection", (socket) => {
     });
   });
 
-  // Remove your old socket.on("startSTT"), socket.on("audioChunk"), 
-  // and socket.on("stopSTT") handlers and replace them with this.
-
   socket.on("audioRecording", async (data) => {
     console.log(`Received audio recording from ${socket.user} for language ${data.language}`);
 
-    // The 'data.audio' should be the Uint8List (Buffer) from your Flutter app
     const audioBytes = data.audio;
 
     const request = {
       config: {
-        encoding: "LINEAR16", // Or "AAC" if you used Codec.aacADTS in Flutter
+        encoding: "LINEAR16",
         sampleRateHertz: 16000,
         languageCode: data.language || "en-US",
       },
       audio: {
-        content: Buffer.from(data.audio).toString("base64"), // Send the whole file as a base64 string
+        content: Buffer.from(data.audio).toString("base64"),
       },
     };
 
@@ -118,12 +116,19 @@ IO.on("connection", (socket) => {
       console.log(`Transcription [${socket.user}]: ${transcription}`);
 
       if (transcription) {
-        // 2. Translate the final transcription
+        // 2. Translate the final transcription using V3
         const targetLang = data.language === "en-US" ? "my" : "en";
-        const [translatedText] = await translate.translate(
-          transcription,
-          targetLang
-        );
+        const translateRequest = {
+          parent: `projects/${projectId}/locations/${location}`,
+          contents: [transcription],
+          mimeType: "text/plain",
+          sourceLanguageCode: data.language,
+          targetLanguageCode: targetLang,
+        };
+        
+        const [translationResponse] = await translationClient.translateText(translateRequest);
+        const translatedText = translationResponse.translations[0].translatedText;
+
         console.log(`Translated [${socket.user}]: ${translatedText}`);
 
         // 3. Send the final result back to the client(s)
@@ -136,87 +141,11 @@ IO.on("connection", (socket) => {
 
         // Send to the other user
         socket.to(data.to).emit("sttResult", resultPayload);
-        // Send back to the original user
-        //socket.emit("sttResult", resultPayload);
       }
     } catch (err) {
       console.error("Google Speech-to-Text Error:", err);
     }
   });
-  /*   // --- Speech-to-Text + Translation ---
-    let recognizeStream = null;
-  
-    socket.on("startSTT", (data) => {
-      console.log("Starting STT for", socket.user, "lang:", data.language);
-  
-      recognizeStream = client
-        .streamingRecognize({
-          config: {
-            encoding: "LINEAR16",
-            sampleRateHertz: 16000,
-            languageCode: data.language || "en-US", // choose "en-US" or "my-MM"
-          },
-          interimResults: true,
-        })
-        .on("error", (err) => console.error("STT error:", err))
-        .on("data", async (sttData) => {
-          console.log(sttData,"STTData");
-          const transcription =
-            sttData.results[0]?.alternatives[0]?.transcript || "";
-          if (transcription) {
-            console.log(`Transcription [${socket.user}]: ${transcription}`);
-  
-            // Auto-detect translation target
-            let targetLang = data.language === "en-US" ? "my" : "en";
-            let [translatedText] = await translate.translate(
-              transcription,
-              targetLang
-            );
-            console.log(translatedText,"Translated-text");
-            // Send both original + translated back
-            socket.to(data.to).emit("sttResult", {
-              text: transcription,
-              translated: translatedText,
-              from: data.language,
-              to: targetLang,
-            });
-            socket.emit("sttResult", {
-              text: transcription,
-              translated: translatedText,
-              from: data.language,
-              to: targetLang,
-            });
-          }
-        });
-    });
-  
-    socket.on("audioChunk", (chunk) => {
-     if (recognizeStream && !recognizeStream.destroyed) {
-      try {
-        recognizeStream.write(chunk);
-      } catch (err) {
-        console.error("Error writing audio chunk:", err);
-      }
-    }
-    });
-  
-    socket.on("stopSTT", () => {
-      if (recognizeStream) {
-        recognizeStream.end();
-        recognizeStream = null;
-        console.log("Stopped STT for", socket.user);
-      }
-    });
-  
-  
-    socket.on("disconnect", () => {
-      console.log(socket.user, "Disconnected");
-      if (recognizeStream) {
-        recognizeStream.end();
-        recognizeStream = null;
-        console.log("Stopped STT for", socket.user);
-      }
-    }); */
 });
 
 const PORT = process.env.PORT || 3000;
